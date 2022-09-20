@@ -12,7 +12,13 @@ import {
   BlacklistToken,
   BlacklistTokenDocument,
 } from './schemas/blacklistToken.schema';
+import * as yup from 'yup';
+import yupValidation from '../utils/yupValidation';
 
+const formLoginSchema = yup.object({
+  username: yup.string().required('username is required'),
+  password: yup.string().required('password is required'),
+});
 @Injectable()
 export class AuthService {
   constructor(
@@ -23,13 +29,19 @@ export class AuthService {
   ) {}
 
   async validateUserPass(username: string, password: string): Promise<any> {
-    const user = await this.findUser(username);
-    if (!user) throw new BadRequestException();
+    const { isValidated } = await yupValidation(
+      { username, password },
+      formLoginSchema,
+    );
+    if (isValidated) {
+      const user = await this.findUser(username);
+      if (!user) throw new BadRequestException();
 
-    if (!(await bcrypt.compare(password, user.password)))
-      throw new UnauthorizedException();
+      if (!(await bcrypt.compare(password, user.password)))
+        throw new UnauthorizedException('invalid login');
 
-    return user;
+      return user;
+    }
   }
 
   async generateToken(user: User) {

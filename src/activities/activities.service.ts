@@ -5,17 +5,49 @@ import { PaginationParams } from '../utils/paginationParams';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { Activity, ActivityDocument } from './schemas/activity.schema';
+import * as yup from 'yup';
+import yupValidation from '../utils/yupValidation';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class ActivitiesService {
   constructor(
     @InjectModel(Activity.name) private ActivityModel: Model<ActivityDocument>,
+    private userService: UsersService,
   ) {}
 
   async create(createActivityDto: CreateActivityDto) {
+    const user = await this.userService.findUserWhereSkill(
+      createActivityDto.skill,
+    );
+    const userArr = user.map((i: any) => i._id.toString());
+
+    const formCreateSchema = yup.object({
+      title: yup.string().required('title is required'),
+      description: yup.string().required('description is required'),
+      startdate: yup.date().required('startdate is required'),
+      enddate: yup
+        .date()
+        .min(yup.ref('startdate'), "end date can't be before start date")
+        .required('enddate is required'),
+      skill: yup.string().required('password is required'),
+      participants: yup
+        .array()
+        .of(yup.string().oneOf(userArr).required('participants is required')),
+    });
+
+    const { isValidated, errors } = await yupValidation(
+      createActivityDto,
+      formCreateSchema,
+    );
+
     try {
-      await new this.ActivityModel(createActivityDto).save();
-      return { message: 'create success' };
+      if (isValidated) {
+        await new this.ActivityModel(createActivityDto).save();
+        return { message: 'create success' };
+      } else {
+        throw new BadRequestException(errors);
+      }
     } catch (error) {
       throw new BadRequestException('Data cannot be processed');
     }
@@ -42,9 +74,36 @@ export class ActivitiesService {
   }
 
   async update(id: string, updateActivityDto: UpdateActivityDto) {
+    const user = await this.userService.findUserWhereSkill(
+      updateActivityDto.skill,
+    );
+    const userArr = user.map((i: any) => i._id.toString());
+
+    const formEditSchema = yup.object({
+      title: yup.string().required('title is required'),
+      description: yup.string().required('description is required'),
+      startdate: yup.date().required('startdate is required'),
+      enddate: yup
+        .date()
+        .min(yup.ref('startdate'), "end date can't be before start date")
+        .required('enddate is required'),
+      skill: yup.string().required('password is required'),
+      participants: yup
+        .array()
+        .of(yup.string().oneOf(userArr).required('participants is required')),
+    });
+
+    const { isValidated, errors } = await yupValidation(
+      updateActivityDto,
+      formEditSchema,
+    );
     try {
-      await this.ActivityModel.findByIdAndUpdate(id, updateActivityDto);
-      return { message: 'update success' };
+      if (isValidated) {
+        await this.ActivityModel.findByIdAndUpdate(id, updateActivityDto);
+        return { message: 'update success' };
+      } else {
+        throw new BadRequestException(errors);
+      }
     } catch (error) {
       throw new BadRequestException('Data cannot be processed');
     }
